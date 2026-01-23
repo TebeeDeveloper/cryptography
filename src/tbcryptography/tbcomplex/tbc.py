@@ -48,12 +48,12 @@ class TripleBlockCipher:
                 # Tầng 1 & 2
                 self._lib.Cipher_encrypt(c_ptr, mutable_data, ctypes.c_size_t(data_len), ctypes.c_float(block_key))
                 # Tầng 3 (Enigma) - Xử lý từng byte
-                for i in range(data_len):
-                    mutable_data[i] = self._lib.EnigmaMachine_process(e_ptr, mutable_data[i])
+                #for i in range(data_len):
+                    #mutable_data[i] = self._lib.EnigmaMachine_process(e_ptr, mutable_data[i])
             else:
                 # Ngược lại cho Decrypt
-                for i in range(data_len):
-                    mutable_data[i] = self._lib.EnigmaMachine_process(e_ptr, mutable_data[i])
+                #for i in range(data_len):
+                    #mutable_data[i] = self._lib.EnigmaMachine_process(e_ptr, mutable_data[i])
                 self._lib.Cipher_decrypt(c_ptr, mutable_data, ctypes.c_size_t(data_len), ctypes.c_float(block_key))
             
             return bytes(mutable_data)
