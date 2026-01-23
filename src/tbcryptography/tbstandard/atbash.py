@@ -4,7 +4,7 @@ from pathlib import Path
 class AtbashCipher:
     def __init__(self):
         # Lấy thư mục hiện tại của tệp này
-        base_dir = Path(__file__).parent
+        base_dir = Path(__file__).parent.parent
         # Xây dựng đường dẫn đến thư viện DLL tại tbcryptography/bin/atbash.dll
         dll_path = base_dir / 'bin' / 'atbash.dll'
         self._lib = ctypes.CDLL(dll_path)
