@@ -17,7 +17,7 @@ class TripleBlockCipher:
         self._lib.Cipher_new.restype = ctypes.c_void_p
         self._lib.Cipher_new.argtypes = [ctypes.c_size_t]
         
-        arg_types_cipher = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.c_uint64]
+        arg_types_cipher = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.c_float]
         self._lib.Cipher_encrypt.argtypes = arg_types_cipher
         self._lib.Cipher_decrypt.argtypes = arg_types_cipher
         self._lib.Cipher_delete.argtypes = [ctypes.c_void_p]
@@ -46,7 +46,7 @@ class TripleBlockCipher:
             # Giả sử encrypt: Block -> Enigma | decrypt: Enigma -> Block
             if mode == "encrypt":
                 # Tầng 1 & 2
-                self._lib.Cipher_encrypt(c_ptr, mutable_data, ctypes.c_size_t(data_len), ctypes.c_uint64(block_key))
+                self._lib.Cipher_encrypt(c_ptr, mutable_data, ctypes.c_size_t(data_len), ctypes.c_float(block_key))
                 # Tầng 3 (Enigma) - Xử lý từng byte
                 for i in range(data_len):
                     mutable_data[i] = self._lib.EnigmaMachine_process(e_ptr, mutable_data[i])
@@ -54,7 +54,7 @@ class TripleBlockCipher:
                 # Ngược lại cho Decrypt
                 for i in range(data_len):
                     mutable_data[i] = self._lib.EnigmaMachine_process(e_ptr, mutable_data[i])
-                self._lib.Cipher_decrypt(c_ptr, mutable_data, ctypes.c_size_t(data_len), ctypes.c_uint64(block_key))
+                self._lib.Cipher_decrypt(c_ptr, mutable_data, ctypes.c_size_t(data_len), ctypes.c_float(block_key))
             
             return bytes(mutable_data)
         
