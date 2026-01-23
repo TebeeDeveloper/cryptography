@@ -3,8 +3,8 @@ from pathlib import Path
 
 class CaesarCipher:
     def __init__(self):
-        # Lùi ra 1 cấp từ tbstandard/ để vào bin/
-        base_dir = Path(__file__).parent.parent 
+        # Lùi ra 1 cấp từ tbcryptography/ để vào bin/
+        base_dir = Path(__file__).parent.parent
         dll_path = base_dir / "bin" / "caesar.dll"
         
         # Dùng CDLL nếu anh không chắc về __stdcall, hoặc WinDLL nếu có dùng nó
