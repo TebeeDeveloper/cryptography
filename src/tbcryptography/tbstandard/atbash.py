@@ -11,8 +11,8 @@ class AtbashCipher:
         self.initial_args()
     def initial_args(self):
         # Khởi tạo các đối số nếu cần thiết
-        self._lib.atbash.argtypes = [ctypes.c_char_p]
-        self._lib.atbash.restype = None
+        self._lib.process.argtypes = [ctypes.c_char_p]
+        self._lib.process.restype = None
 
     def process(self, input_text: str) -> str:
         # Chuyển đổi chuỗi đầu vào thành bytes
@@ -20,6 +20,6 @@ class AtbashCipher:
         # Tạo một buffer để lưu trữ kết quả
         output_buffer = ctypes.create_string_buffer(len(input_bytes) + 1)
         # Gọi hàm từ DLL
-        self._lib.atbash_process(ctypes.c_char_p(input_bytes), output_buffer)
+        self._lib.process(ctypes.c_char_p(input_bytes), output_buffer)
         # Chuyển đổi kết quả từ bytes trở lại chuỗi
         return output_buffer.raw[:len(input_bytes)].decode('utf-8')
