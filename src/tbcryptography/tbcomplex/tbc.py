@@ -4,12 +4,13 @@ from pathlib import Path
 class TripleBlockCipher:
     def __init__(self):
         base_dir = Path(__file__).parent.parent
+        print(base_dir)
         dll_path = base_dir / "bin" / "tbc.dll"
         
         if not dll_path.exists():
             raise FileNotFoundError(f"DLL bị lạc ở đâu rồi: {dll_path}")
             
-        self._lib = ctypes.CDLL(str(dll_path))
+        self._lib = ctypes.CDLL(str(dll_path), winmode=0)
         self.__initial_args__()
 
     def __initial_args__(self):
@@ -72,3 +73,5 @@ class TripleBlockCipher:
             return decrypted.decode()
         except ValueError, UnicodeDecodeError:
             return decrypted
+
+tbc = TripleBlockCipher()
