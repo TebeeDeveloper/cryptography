@@ -31,9 +31,10 @@ class TripleBlockCipher:
         
         self._lib.EnigmaMachine_delete.argtypes = [ctypes.c_void_p]
 
-    def __process__(self, data: bytes, block_key: int, enigma_key: float, mode: str = "encrypt") -> bytes:
+    def __process__(self, data: str | bytes, block_key: int, enigma_key: float, mode: str = "encrypt") -> bytes:
         """Hàm thực hiện mã hóa 3 tầng: 2 tầng Block + 1 tầng Enigma"""
         data_len = len(data)
+        data = bytearray(data.encode()) if isinstance(data, str) else data
         mutable_data = (ctypes.c_uint8 * data_len).from_buffer_copy(data)
         
         # Khởi tạo các "cỗ máy"
@@ -62,8 +63,8 @@ class TripleBlockCipher:
             self._lib.Cipher_delete(c_ptr)
             self._lib.EnigmaMachine_delete(e_ptr)
 
-    def encrypt(self, data: bytes, b_key: int, e_key: float) -> bytes:
+    def encrypt(self, data: str | bytes, b_key: int, e_key: float) -> bytes:
         return self.__process__(data, b_key, e_key, "encrypt")
 
-    def decrypt(self, data: bytes, b_key: int, e_key: float) -> bytes:
+    def decrypt(self, data: str | bytes, b_key: int, e_key: float) -> bytes:
         return self.__process__(data, b_key, e_key, "decrypt")
