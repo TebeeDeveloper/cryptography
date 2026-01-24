@@ -63,8 +63,12 @@ class TripleBlockCipher:
             self._lib.Cipher_delete(c_ptr)
             self._lib.EnigmaMachine_delete(e_ptr)
 
-    def encrypt(self, data: str | bytes, b_key: int, e_key: float) -> bytes:
-        return self.__process__(data, b_key, e_key, "encrypt")
+    def encrypt(self, data: str | bytes, b_key: int, e_key: float) -> str:
+        return self.__process__(data, b_key, e_key, "encrypt").hex()
 
-    def decrypt(self, data: str | bytes, b_key: int, e_key: float) -> bytes:
-        return self.__process__(data, b_key, e_key, "decrypt")
+    def decrypt(self, data: str | bytes, b_key: int, e_key: float) -> str | bytes | None:
+        decrypted : bytes = self.__process__(data, b_key, e_key, "decrypt")
+        try:
+            return decrypted.decode()
+        except ValueError, UnicodeDecodeError:
+            return decrypted
