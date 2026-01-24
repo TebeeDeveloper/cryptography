@@ -17,7 +17,7 @@ class TebeeFastStreamCipher:
         self._lib.tfsc_process_export.argtypes = [
             ctypes.POINTER(ctypes.c_uint8), 
             ctypes.c_size_t,
-            ctypes.c_uint64  # Anh đổi lại thành c_float nếu DLL nhận float nha!
+            ctypes.c_float  # Anh đổi lại thành c_float nếu DLL nhận float nha!
         ]
         self._lib.tfsc_process_export.restype = None
 
