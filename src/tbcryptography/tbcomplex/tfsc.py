@@ -41,7 +41,7 @@ class TebeeFastStreamCipher:
             self._lib.tfsc_process_export(
                 chunk_ptr, 
                 ctypes.c_size_t(current_chunk_size), 
-                ctypes.c_uint64(key)
+                ctypes.c_float(key)
             )
             
         return bytes(result)
