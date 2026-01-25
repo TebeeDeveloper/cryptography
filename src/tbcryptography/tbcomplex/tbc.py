@@ -86,13 +86,3 @@ class TripleBlockCipher:
         except (ValueError, UnicodeDecodeError):
             # Nếu không decode được sang string thì trả về bytes gốc
             return decrypted
-
-tbc = TripleBlockCipher()
-msg = "Tebee Love"
-key = 12
-ekey = 14
-
-c = tbc.encrypt(msg, key, ekey)
-p = tbc.decrypt(c, key, ekey)
-print(c)
-print(p)
