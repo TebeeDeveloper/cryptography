@@ -30,7 +30,7 @@ class TebeeFastStreamCipher:
         ]
         self.__lib__.tfsc_process_export.restype = None
 
-    def process(self, data: str | bytes | bytearray, key: float, chunk_size: int = 1024 * 1024) -> bytes:
+    def process(self, data: str | bytes | bytearray, key: float) -> bytes:
         """
         Xử lý Stream Cipher với cơ chế Zero-copy cực nhanh!
         """
@@ -49,6 +49,8 @@ class TebeeFastStreamCipher:
         # Hare's Safety Check: Nếu data rỗng thì nghỉ khỏe!
         if total_size == 0:
             return b""
+        
+        chunk_size: int = 1024 * 1024
 
         for i in range(0, total_size, chunk_size):
             current_chunk_size = min(chunk_size, total_size - i)
