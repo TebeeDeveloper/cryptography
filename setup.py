@@ -9,7 +9,7 @@ if os.path.exists("LICENSE"):
 
 setup(
     name="tbcryptography",
-    version="0.1.0",
+    version="0.1.1",
     author="TebeeDeveloper",
     url="https://github.com/TebeeDeveloper/cryptography",
 

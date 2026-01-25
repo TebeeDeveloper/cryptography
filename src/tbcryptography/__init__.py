@@ -1,6 +1,6 @@
 from .tbstandard.atbash import AtbashCipher
 from .tbstandard.caesar import CaesarCipher
-from .tbstandard.enigma import EnigmaCipher
+from .tbstandard.enigma import EnigmaMachine
 from .tbstandard.vigenere import VigenereCipher
 
 from .tbcomplex.tbc import TripleBlockCipher
@@ -8,7 +8,6 @@ from .tbcomplex.tfsc import TebeeFastStreamCipher
 
 atbash = AtbashCipher()
 caesar = CaesarCipher()
-enigma = EnigmaCipher()
 vigenere = VigenereCipher()
 
 tbc = TripleBlockCipher()
