@@ -19,7 +19,7 @@ def caesar_mc() -> None:
 def enigma_mc() -> None:
     while True:
         seed = input("Nhập seed của bạn: ")
-        if msg == "quit()":
+        if seed == "quit()":
             return None
         seed = eval(seed)
         enigma = EnigmaMachine(seed)
@@ -83,4 +83,4 @@ while True:
     if machine == "tfsc":
         tfsc_mc()
         continue
-    continue
+    break
