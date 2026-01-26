@@ -38,35 +38,24 @@ class TebeeFastStreamCipher:
         self.__lib__.tfsc_decrypt.restype = ctypes.c_size_t
 
     def encrypt(self, data: str | bytes | bytearray, key: float) -> bytes:
-        # 1. Chuẩn bị dữ liệu
-        if isinstance(data, str):
-            raw_data = bytearray(data.encode('utf-8'))
-        else:
-            # Nếu là bytes, mình buộc phải copy sang bytearray để C++ sửa được
-            raw_data = bytearray(data)
-
-        original_len = len(raw_data)
+        """Mã hóa trực tiếp trên buffer cũ, trả về độ dài mới"""
+        original_len = len(data)
         padded_len = original_len if original_len % 16 == 0 else ((original_len // 16) + 1) * 16
         
-        # 2. Mở rộng buffer (Chỉ nới rộng nếu cần, tránh tạo mảng mới)
-        if len(raw_data) < padded_len:
-            raw_data.extend(b'\x00' * (padded_len - original_len))
+        # Mở rộng buffer nếu cần (chỉ tốn thêm vài bytes padding)
+        if len(data) < padded_len:
+            data.extend(b'\x00' * (padded_len - original_len))
 
-        # 3. Thao tác trực tiếp trên vùng nhớ (Zero-copy trỏ vào C++)
-        c_buffer = (ctypes.c_uint8 * len(raw_data)).from_buffer(raw_data)
+        # Trỏ thẳng vào RAM của bytearray
+        c_buffer = (ctypes.c_uint8 * len(data)).from_buffer(data)
         
+        # C++ xử lý thẳng trên vùng nhớ này
         new_size = self.__lib__.tfsc_encrypt(
             ctypes.cast(c_buffer, ctypes.POINTER(ctypes.c_uint8)),
             ctypes.c_size_t(original_len),
             ctypes.c_float(key)
         )
-        
-        # 4. FIX Ở ĐÂY: Trả về một đối tượng bytes chỉ chứa phần dữ liệu hữu ích
-        # Nếu data cực lớn, hãy cân nhắc dùng memoryview(raw_data)[:new_size]
-        # Nhưng để tiện cho anh dùng, em sẽ dùng cách này để giải phóng raw_data sớm:
-        result = bytes(memoryview(raw_data)[:new_size])
-        del raw_data # Ép Python dọn dẹp sớm cái bytearray tạm thời
-        return result
+        return new_size # Chỉ trả về kích thước, dữ liệu nằm sẵn trong 'data' rồi!
 
     def decrypt(self, data: bytes | bytearray, key: float) -> bytes:
         # Dữ liệu giải mã phải luôn là bội số của 16
