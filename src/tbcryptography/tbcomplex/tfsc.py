@@ -23,53 +23,64 @@ class TebeeFastStreamCipher:
     def __initial_args__(self) -> None:
         """Khai báo Interface với thế giới C++"""
         # C++: extern "C" void tfsc_process_export(uint8_t* data, size_t size, float key)
-        self.__lib__.tfsc_process_export.argtypes = [
+        self.__lib__.tfsc_encrypt.argtypes = [
             ctypes.POINTER(ctypes.c_uint8), 
             ctypes.c_size_t,
             ctypes.c_float
         ]
-        self.__lib__.tfsc_process_export.restype = None
+        self.__lib__.tfsc_encrypt.restype = ctypes.c_size_t
+        
+        self.__lib__.tfsc_decrypt.argtypes = [
+            ctypes.POINTER(ctypes.c_uint8),
+            ctypes.c_size_t,
+            ctypes.c_float
+        ]
+        self.__lib__.tfsc_decrypt.restype = ctypes.c_size_t
 
-    def process(self, data: str | bytes | bytearray, key: float) -> bytes:
-        """
-        Xử lý Stream Cipher với cơ chế Zero-copy cực nhanh!
-        """
-        # Chuyển đổi input sang bytearray để có thể sửa đổi in-place
+    def encrypt(self, data: str | bytes | bytearray, key: float) -> bytes:
+        # Chuyển đổi mọi thứ về bytearray để có thể chỉnh sửa (mutable)
         if isinstance(data, str):
-            # Giả định nếu là string thì nó là Hex, nếu không phải anh nhớ báo em nhé!
-            try:
-                result = bytearray(bytes.fromhex(data))
-            except ValueError:
-                result = bytearray(data.encode('utf-8'))
+            raw_data = bytearray(data.encode('utf-8'))
         else:
-            result = bytearray(data)
-            
-        total_size: int = len(result)
-        
-        # Hare's Safety Check: Nếu data rỗng thì nghỉ khỏe!
-        if total_size == 0:
-            return b""
-        
-        chunk_size: int = 1024 * 1024
+            raw_data = bytearray(data)
 
-        for i in range(0, total_size, chunk_size):
-            current_chunk_size = min(chunk_size, total_size - i)
-            
-            # Kỹ thuật In-place của Tebee-kun:
-            # Dùng from_buffer để tạo view thay vì copy. Rất tốt!
-            try:
-                # Chỗ này anh nhớ là result[i:i+current_chunk_size] 
-                # chỉ tạo view nhờ ctypes, không tốn thêm RAM đâu!
-                chunk_ptr = (ctypes.c_uint8 * current_chunk_size).from_buffer(result, i)
-                
-                self.__lib__.tfsc_process_export(
-                    chunk_ptr, 
-                    ctypes.c_size_t(current_chunk_size), 
-                    ctypes.c_float(key)
-                )
-            except BufferError:
-                # Lỗi này xảy ra nếu buffer đang bị lock bởi một process khác
-                print("Lỗi Buffer rồi Tebee! Anh đang làm gì nó vậy? 💢")
-                raise
-            
-        return bytes(result)
+        # Tính toán độ dài cần thiết cho block 16 bytes (Hare's Logic)
+        original_len = len(raw_data)
+        padded_len = original_len if original_len % 16 == 0 else ((original_len // 16) + 1) * 16
+        
+        # Mở rộng buffer để C++ có chỗ mà ghi Padding
+        if len(raw_data) < padded_len:
+            raw_data.extend([0] * (padded_len - original_len))
+
+        # Tạo pointer trỏ thẳng vào vùng nhớ của bytearray
+        c_buffer = (ctypes.c_uint8 * len(raw_data)).from_buffer(raw_data)
+        
+        # Gọi C++ để padding và mã hóa
+        # Trả về kích thước thực tế sau khi xử lý
+        new_size = self.__lib__.tfsc_encrypt(
+            ctypes.cast(c_buffer, ctypes.POINTER(ctypes.c_uint8)),
+            ctypes.c_size_t(original_len),
+            ctypes.c_float(key)
+        )
+        
+        # Trả về bytes sạch sẽ cho Tebee
+        return bytes(raw_data[:new_size])
+
+    def decrypt(self, data: bytes | bytearray, key: float) -> bytes:
+        # Dữ liệu giải mã phải luôn là bội số của 16
+        if len(data) % 16 != 0:
+            raise ValueError("Tebee ơi, dữ liệu này không đúng kích thước block 16 bytes rồi!")
+
+        # Copy ra một bản tạm để xử lý trên RAM
+        process_buffer = bytearray(data)
+        c_buffer = (ctypes.c_uint8 * len(process_buffer)).from_buffer(process_buffer)
+
+        # Gọi C++ để giải mã và gỡ padding
+        actual_size = self.__lib__.tfsc_decrypt(
+            ctypes.cast(c_buffer, ctypes.POINTER(ctypes.c_uint8)),
+            ctypes.c_size_t(len(process_buffer)),
+            ctypes.c_float(key)
+        )
+
+        # Cắt bỏ phần padding dư thừa dựa trên size trả về từ C++
+        return bytes(process_buffer[:actual_size])
