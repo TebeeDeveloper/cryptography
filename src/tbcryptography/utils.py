@@ -64,7 +64,7 @@ def tfsc_mc() -> None:
         if key == "quit()":
             return None
         if key == "mykey":
-            key = input("Nhập khóa:\n>>>> ")
+            key = bytes(input("Nhập khóa:\n>>>> "))
         if key == "random":
             key = os.urandom(128)
         msg = input("Nhập tin nhắn của bạn:\n>>>>")
