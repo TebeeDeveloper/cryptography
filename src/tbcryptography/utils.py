@@ -67,7 +67,8 @@ def tfsc_mc() -> None:
             key = input("Nhập khóa:\n>>>> ")
         if key == "random":
             key = os.urandom(128)
-        msg = bytearray(input("Nhập tin nhắn của bạn:\n>>>> ").encode())
+        msg = input("Nhập tin nhắn của bạn:\n>>>>")
+        msg = bytearray(msg.encode())
         if mode == "encrypt":
             tfsc.encrypt(msg, key)
             print(key)
