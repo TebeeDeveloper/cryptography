@@ -1,77 +1,83 @@
 import ctypes
+import os
 from pathlib import Path
 from typing import Final
 
 class TebeeFastStreamCipher:
     def __init__(self) -> None:
-        # Sử dụng Final để đảm bảo các hằng số không bị ghi đè lung tung
         self.__BASE_DIR__: Final = Path(__file__).parent.parent
+        # Chỉnh lại đường dẫn chuẩn theo cấu trúc của anh
         self.__DLL_PATH__: Final = self.__BASE_DIR__ / "bin" / "tfsc.dll"
         
         if not self.__DLL_PATH__.exists():
-            raise FileNotFoundError(f"Tebee ơi, em không thấy DLL ở: {self.__DLL_PATH__} 😭")
+            raise FileNotFoundError(f"Không thấy DLL tại: {self.__DLL_PATH__}")
             
-        # Load DLL với chế độ an toàn
-        try:
-            self.__lib__ = ctypes.CDLL(str(self.__DLL_PATH__))
-        except Exception as e:
-            print(f"Lỗi load DLL rồi anh ơi: {e}")
-            raise
-
+        self.__lib__ = ctypes.CDLL(str(self.__DLL_PATH__))
         self.__initial_args__()
 
     def __initial_args__(self) -> None:
-        """Khai báo Interface với thế giới C++"""
-        # C++: extern "C" void tfsc_process_export(uint8_t* data, size_t size, float key)
-        self.__lib__.tfsc_encrypt.argtypes = [
-            ctypes.POINTER(ctypes.c_uint8), 
-            ctypes.c_size_t,
-            ctypes.c_float
+        # Cấu trúc: void tfsc_encrypt(uint8_t* data, size_t len, uint8_t* key)
+        common_args = [
+            ctypes.POINTER(ctypes.c_uint8), # Data
+            ctypes.c_size_t,               # Len
+            ctypes.POINTER(ctypes.c_uint8)  # Key (128 bytes)
         ]
-        self.__lib__.tfsc_encrypt.restype = ctypes.c_size_t
         
-        self.__lib__.tfsc_decrypt.argtypes = [
-            ctypes.POINTER(ctypes.c_uint8),
-            ctypes.c_size_t,
-            ctypes.c_float
-        ]
-        self.__lib__.tfsc_decrypt.restype = ctypes.c_size_t
-
-    def encrypt(self, data: str | bytes | bytearray, key: float) -> bytes:
-        """Mã hóa trực tiếp trên buffer cũ, trả về độ dài mới"""
-        original_len = len(data)
-        padded_len = original_len if original_len % 16 == 0 else ((original_len // 16) + 1) * 16
+        self.__lib__.tfsc_encrypt.argtypes = common_args
+        self.__lib__.tfsc_encrypt.restype = None
         
-        # Mở rộng buffer nếu cần (chỉ tốn thêm vài bytes padding)
-        if len(data) < padded_len:
-            data.extend(b'\x00' * (padded_len - original_len))
+        self.__lib__.tfsc_decrypt.argtypes = common_args
+        self.__lib__.tfsc_decrypt.restype = None
 
-        # Trỏ thẳng vào RAM của bytearray
-        c_buffer = (ctypes.c_uint8 * len(data)).from_buffer(data)
+    def to_byte(self, data: str) -> bytearray:
+        return bytearray(data.encode('utf-8'))
+
+    def encrypt(self, data: bytearray, key: bytes) -> None:
+        if not isinstance(data, bytearray):
+            raise TypeError("Data phải là bytearray nha!")
         
-        # C++ xử lý thẳng trên vùng nhớ này
-        new_size = self.__lib__.tfsc_encrypt(
-            ctypes.cast(c_buffer, ctypes.POINTER(ctypes.c_uint8)),
-            ctypes.c_size_t(original_len),
-            ctypes.c_float(key)
-        )
-        return new_size # Chỉ trả về kích thước, dữ liệu nằm sẵn trong 'data' rồi!
+        # 1. Padding PKCS#7
+        orig_len = len(data)
+        pad_needed = 16 - (orig_len % 16)
+        data.extend([pad_needed] * pad_needed)
 
-    def decrypt(self, data: bytes | bytearray, key: float) -> bytes:
-        # Dữ liệu giải mã phải luôn là bội số của 16
-        if len(data) % 16 != 0:
-            raise ValueError("Tebee ơi, dữ liệu này không đúng kích thước block 16 bytes rồi!")
+        # 2. Gọi C++ thông qua hàm con để giải phóng pointer ngay
+        def _execute():
+            # Tạo pointer cho data
+            data_ptr = (ctypes.c_uint8 * len(data)).from_buffer(data)
+            # Tạo pointer cho key (chỉ đọc)
+            key_ptr = (ctypes.c_uint8 * 128).from_buffer_copy(key)
+            
+            self.__lib__.tfsc_encrypt(
+                ctypes.cast(data_ptr, ctypes.POINTER(ctypes.c_uint8)),
+                ctypes.c_size_t(len(data)),
+                ctypes.cast(key_ptr, ctypes.POINTER(ctypes.c_uint8))
+            )
+        
+        _execute()
 
-        # Copy ra một bản tạm để xử lý trên RAM
-        process_buffer = bytearray(data)
-        c_buffer = (ctypes.c_uint8 * len(process_buffer)).from_buffer(process_buffer)
+    def decrypt(self, data: bytearray, key: bytes) -> None:
+        if not data or len(data) % 16 != 0: return
 
-        # Gọi C++ để giải mã và gỡ padding
-        actual_size = self.__lib__.tfsc_decrypt(
-            ctypes.cast(c_buffer, ctypes.POINTER(ctypes.c_uint8)),
-            ctypes.c_size_t(len(process_buffer)),
-            ctypes.c_float(key)
-        )
+        def _execute():
+            data_ptr = (ctypes.c_uint8 * len(data)).from_buffer(data)
+            key_ptr = (ctypes.c_uint8 * 128).from_buffer_copy(key)
+            
+            self.__lib__.tfsc_decrypt(
+                ctypes.cast(data_ptr, ctypes.POINTER(ctypes.c_uint8)),
+                ctypes.c_size_t(len(data)),
+                ctypes.cast(key_ptr, ctypes.POINTER(ctypes.c_uint8))
+            )
+        
+        _execute()
 
-        # Cắt bỏ phần padding dư thừa dựa trên size trả về từ C++
-        return bytes(process_buffer[:actual_size])
+        pad_val = data[-1]
+        # Unpadding
+        if 0 < pad_val <= 16:
+            # Chỉ lấy phần dữ liệu xịn, bỏ phần padding
+            clean_data = data[:-pad_val]
+        else:
+            clean_data = data
+
+        # Trả về chuỗi string đã decode
+        return clean_data.decode('utf-8', errors='ignore')
