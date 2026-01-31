@@ -72,18 +72,36 @@ class TBAEMS:
         buffer = (ctypes.c_uint8 * 32)()
         lib.GenerateKey256bit(buffer)
         return bytes(buffer)
+    
+    def pad(self, data: bytes) -> bytes:
+        # 1. Thêm byte 0x80
+        data += b'\x80'
+        # 2. Thêm 0x00 cho đến khi chia hết cho 16
+        while len(data) % 16 != 0:
+            data += b'\x00'
+        return data
 
-    def encrypt(self, data: bytes | bytearray) -> bytes:
-        # 1. Cấp phát buffer có trừ hao cho Padding (bội số của 16)
-        padded_length = ((len(data) // 16) + 1) * 16
-        buffer = ctypes.create_string_buffer(bytes(data), padded_length)
+    def unpad(self, data: bytes) -> bytes:
+        # Tìm vị trí byte 0x80 cuối cùng từ phải sang
+        idx = data.rfind(b'\x80')
+        if idx != -1:
+            return data[:idx]
+        return data
+
+    def encrypt(self, data: bytearray) -> int:
+        length = len(data)
+        padded_length = ((length // 16) + 1) * 16
         
-        ptr = ctypes.cast(buffer, ctypes.POINTER(ctypes.c_uint8))
-        # 2. C++ thực hiện Pad và Encrypt, trả về độ dài mới
-        new_size = self.__lib__.Encrypt(self._instance, ptr, len(data))
+        # Nới rộng bytearray để C++ có chỗ ghi thêm Pad (vô cùng tiết kiệm RAM!)
+        data.extend(b'\x00' * (padded_length - length))
         
-        # 3. CHỈ lấy đúng new_size bytes đầu tiên
-        return buffer.raw[:new_size]
+        
+        # Lấy pointer trực tiếp từ bytearray của Python
+        ptr = (ctypes.c_uint8 * len(data)).from_buffer(data)
+        
+        # Gọi C++ xử lý in-place trên chính vùng nhớ đó
+        new_size = self.__lib__.Encrypt(self._instance, ptr, length)
+        return new_size
 
     def decrypt(self, encrypted_data: bytes) -> bytes:
         # 1. Tạo buffer từ dữ liệu đã mã hóa
@@ -93,6 +111,7 @@ class TBAEMS:
         # 2. C++ giải mã và Unpad, trả về độ dài thực tế ban đầu
         actual_size = self.__lib__.Decrypt(self._instance, ptr, len(encrypted_data))
         
+        
         # 3. CỰC KỲ QUAN TRỌNG: Chỉ lấy đúng actual_size bytes
         # Dùng .raw sẽ lấy toàn bộ vùng nhớ, nên phải cắt chính xác!
         return buffer.raw[:actual_size]
@@ -101,28 +120,53 @@ class TBAEMS:
         """Hàm hủy để tránh Memory Leak (Cực kỳ quan trọng!)"""
         if hasattr(self, '_instance') and self._instance:
             self.__lib__.DeleteAEMS(self._instance)
-            print("✨ Hare đã dọn dẹp bộ nhớ instance cho Tebee-kun rồi nhé!")
 
 
 if __name__ == "__main__":
-    # 1. Tạo Key siêu cấp mật
-    my_key = TBAEMS.generate_key_256()
-    print(f"Key (32 bytes): {my_key.hex()}")
+    
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from tbcryptography import tfsc
+    import time
+    
+    data = bytearray(1024*1024*512)
+    def aes_():
+        key = AESGCM.generate_key(256)
+        nonce = os.urandom(12)
+        
+        aes = AESGCM(key)
+        
+        start = time.perf_counter()
+        aes.encrypt(nonce, data, None)
+        end = time.perf_counter()
+        
+        print(f"AES-256")
+        print(f"Thời gian mã hóa: {end-start:.4f}")
 
-    # 2. Khởi tạo cipher
-    cipher = TBAEMS(my_key)
+    def tbaems_():
+        key = TBAEMS.generate_key_256()
+        
+        tbaems = TBAEMS(key)
+        
+        start = time.perf_counter()
+        tbaems.encrypt(data)
+        end = time.perf_counter()
+        
+        print(f"TB_AEMS-256")
+        print(f"Thời gian mã hóa: {end-start:.4f}")
+    
+    def tbfs_():
+        start = time.perf_counter()
+        tfsc.encrypt(data, os.urandom(128))
+        end = time.perf_counter()
+        
+        print("TFSC-1024")
+        print(f"Thời gian mã hóa: {end-start:.4f}")
 
-    # 3. Test với dữ liệu thực tế
-    original_text = b"Hare say: I love programming with Tebee-kun!"
-    print(f"Original: {original_text}")
+    aes_()
 
-    # Mã hóa
-    encrypted = cipher.encrypt(original_text)
-    print(f"Encrypted: {encrypted.hex()}")
+    try:
+        tbaems_()
+    except Exception as e:
+        print(e)
 
-    # Giải mã
-    decrypted = cipher.decrypt(encrypted)
-    print(f"Decrypted: {decrypted}")
-
-    assert original_text == decrypted
-    print("✅ Mọi thứ hoàn hảo! Tebee giỏi quá đi mất! (づ￣ ³￣)づ")
+    tbfs_()
