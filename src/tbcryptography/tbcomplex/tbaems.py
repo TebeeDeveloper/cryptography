@@ -67,17 +67,3 @@ class TBAEMS:
         ptr = (ctypes.c_uint8 * len(data)).from_buffer(data)
         actual_size =  self.__lib__.Decrypt(self._instance, ptr, len(data), nonce)
         return data[:actual_size]
-
-if __name__ == "__main__":
-    import numpy as np
-    import time
-    
-    key = TBAEMS.generate_key_256()
-    tbaems = TBAEMS(key)
-
-    data = bytearray(16)
-    nonce = os.urandom(16)
-    size = tbaems.encrypt(data, nonce)
-    print(f"Đã mã hóa: {data.hex()}")
-    dt = tbaems.decrypt(data, nonce)
-    print(f"Đã giải mã: {data.hex()}")
