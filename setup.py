@@ -27,7 +27,7 @@ setup(
     },
     include_package_data=True,
 
-    python_requires=">=3.14",
+    python_requires=">=3.11",
 
     data_files=[('', ['LICENSE'])],
     
