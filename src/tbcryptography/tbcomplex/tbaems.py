@@ -76,34 +76,3 @@ class TBAEMS:
         ptr = (ctypes.c_uint8 * len(data)).from_buffer(data)
         actual_size =  self.__lib__.Decrypt(self._instance, ptr, len(data), nonce)
         return data[:actual_size]
-    
-    def encrypt_file(self, input_path, output_path, nonce):
-        """Mã hóa file theo từng dòng, dùng chung 1 Nonce cho tất cả các dòng."""
-        with open(input_path, 'r', encoding='utf-8') as f_in, \
-             open(output_path, 'wb') as f_out:
-            for line in f_in:
-                # 1. Chuyển dòng thành bytes và Padding
-                data = bytearray(self.pad(line.encode('utf-8')))
-                # 2. Mã hóa bằng DLL C++
-                self.encrypt(data, nonce)
-                # 3. Ghi độ dài block (2 bytes) + dữ liệu mã hóa
-                # Vì mỗi dòng sau mã hóa có độ dài khác nhau nên cần lưu độ dài
-                f_out.write(len(data).to_bytes(2, 'little'))
-                f_out.write(data)
-
-    def decrypt_file(self, input_path, output_path, nonce):
-        """Giải mã file đã mã hóa theo dòng."""
-        with open(input_path, 'rb') as f_in, \
-             open(output_path, 'w', encoding='utf-8') as f_out:
-            while True:
-                # 1. Đọc 2 byte độ dài
-                len_bytes = f_in.read(2)
-                if not len_bytes: break
-                length = int.from_bytes(len_bytes, 'little')
-                
-                # 2. Đọc dữ liệu mã hóa
-                data = bytearray(f_in.read(length))
-                # 3. Giải mã bằng DLL C++
-                decrypted = self.decrypt(data, nonce)
-                # 4. Ghi lại vào file văn bản
-                f_out.write(decrypted.decode('utf-8'))
