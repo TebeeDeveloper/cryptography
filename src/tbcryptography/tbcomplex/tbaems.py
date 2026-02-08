@@ -54,27 +54,22 @@ class TBAEMS:
         dll.GenerateKey256bit(buffer)
         return bytes(buffer)
 
-    def encrypt(self, data: bytearray | memoryview, nonce: bytes) -> int:
-        # Nếu data là memoryview, mình không thể dùng .extend()
-        # Hare sẽ kiểm tra xem có cần padding không.
+    def encrypt(self, data: bytearray, nonce: bytes) -> int:
         length = len(data)
-        
-        # Nếu là memoryview, Hare khuyên Tebee nên pad từ file terminal.py 
-        # trước khi đưa vào đây, hoặc convert tạm sang bytearray nếu bắt buộc
-        if isinstance(data, memoryview):
-            # Với memoryview, chúng ta giả định buffer đã đủ lớn hoặc không cần pad
-            ptr = (ctypes.c_uint8 * length).from_buffer(data)
-            return self.__lib__.Encrypt(self._instance, ptr, length, length, nonce)
-        else:
-            # Code cũ cho bytearray
-            padded_length = ((length // 16) + 1) * 16
+        # Đảm bảo dữ liệu là bội số của 16 cho DLL (Padding)
+        padded_length = ((length // 16) + 1) * 16
+        if length < padded_length:
             data.extend(b'\x00' * (padded_length - length))
-            ptr = (ctypes.c_uint8 * len(data)).from_buffer(data)
-            return self.__lib__.Encrypt(self._instance, ptr, length, len(data), nonce)
+        
+        new_length = len(data)
+        ptr = (ctypes.c_uint8 * new_length).from_buffer(data)
+        # Gọi DLL mã hóa
+        self.__lib__.Encrypt(self._instance, ptr, length, new_length, nonce)
+        return new_length
 
-    def decrypt(self, data: bytearray | memoryview, nonce: bytes) -> int:
+    def decrypt(self, data: bytearray, nonce: bytes) -> int:
         length = len(data)
         ptr = (ctypes.c_uint8 * length).from_buffer(data)
-        # DLL sẽ sửa trực tiếp trên vùng nhớ của 'data'
+        # DLL trả về size thực tế sau khi giải mã
         actual_size = self.__lib__.Decrypt(self._instance, ptr, length, nonce)
         return actual_size
