@@ -54,16 +54,56 @@ class TBAEMS:
         dll.GenerateKey256bit(buffer)
         return bytes(buffer)
 
-    def encrypt(self, data: bytearray, nonce: bytes) -> int:
+    def encrypt(self, data: bytearray | memoryview, nonce: bytes) -> int:
+        # Nếu data là memoryview, mình không thể dùng .extend()
+        # Hare sẽ kiểm tra xem có cần padding không.
         length = len(data)
-        padded_length = ((length // 16) + 1) * 16
-        data.extend(b'\x00' * (padded_length - length))
         
-        ptr = (ctypes.c_uint8 * len(data)).from_buffer(data)
-        # Truyền nonce trực tiếp (Python bytes tự biến thành con trỏ)
-        return self.__lib__.Encrypt(self._instance, ptr, length, len(data), nonce)
+        # Nếu là memoryview, Hare khuyên Tebee nên pad từ file terminal.py 
+        # trước khi đưa vào đây, hoặc convert tạm sang bytearray nếu bắt buộc
+        if isinstance(data, memoryview):
+            # Với memoryview, chúng ta giả định buffer đã đủ lớn hoặc không cần pad
+            ptr = (ctypes.c_uint8 * length).from_buffer(data)
+            return self.__lib__.Encrypt(self._instance, ptr, length, length, nonce)
+        else:
+            # Code cũ cho bytearray
+            padded_length = ((length // 16) + 1) * 16
+            data.extend(b'\x00' * (padded_length - length))
+            ptr = (ctypes.c_uint8 * len(data)).from_buffer(data)
+            return self.__lib__.Encrypt(self._instance, ptr, length, len(data), nonce)
 
     def decrypt(self, data: bytearray, nonce: bytes) -> bytes:
         ptr = (ctypes.c_uint8 * len(data)).from_buffer(data)
         actual_size =  self.__lib__.Decrypt(self._instance, ptr, len(data), nonce)
         return data[:actual_size]
+    
+    def encrypt_file(self, input_path, output_path, nonce):
+        """Mã hóa file theo từng dòng, dùng chung 1 Nonce cho tất cả các dòng."""
+        with open(input_path, 'r', encoding='utf-8') as f_in, \
+             open(output_path, 'wb') as f_out:
+            for line in f_in:
+                # 1. Chuyển dòng thành bytes và Padding
+                data = bytearray(self.pad(line.encode('utf-8')))
+                # 2. Mã hóa bằng DLL C++
+                self.encrypt(data, nonce)
+                # 3. Ghi độ dài block (2 bytes) + dữ liệu mã hóa
+                # Vì mỗi dòng sau mã hóa có độ dài khác nhau nên cần lưu độ dài
+                f_out.write(len(data).to_bytes(2, 'little'))
+                f_out.write(data)
+
+    def decrypt_file(self, input_path, output_path, nonce):
+        """Giải mã file đã mã hóa theo dòng."""
+        with open(input_path, 'rb') as f_in, \
+             open(output_path, 'w', encoding='utf-8') as f_out:
+            while True:
+                # 1. Đọc 2 byte độ dài
+                len_bytes = f_in.read(2)
+                if not len_bytes: break
+                length = int.from_bytes(len_bytes, 'little')
+                
+                # 2. Đọc dữ liệu mã hóa
+                data = bytearray(f_in.read(length))
+                # 3. Giải mã bằng DLL C++
+                decrypted = self.decrypt(data, nonce)
+                # 4. Ghi lại vào file văn bản
+                f_out.write(decrypted.decode('utf-8'))
