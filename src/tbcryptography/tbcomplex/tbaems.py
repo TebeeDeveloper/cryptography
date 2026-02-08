@@ -72,7 +72,9 @@ class TBAEMS:
             ptr = (ctypes.c_uint8 * len(data)).from_buffer(data)
             return self.__lib__.Encrypt(self._instance, ptr, length, len(data), nonce)
 
-    def decrypt(self, data: bytearray, nonce: bytes) -> bytes:
-        ptr = (ctypes.c_uint8 * len(data)).from_buffer(data)
-        actual_size =  self.__lib__.Decrypt(self._instance, ptr, len(data), nonce)
-        return data[:actual_size]
+    def decrypt(self, data: bytearray | memoryview, nonce: bytes) -> int:
+        length = len(data)
+        ptr = (ctypes.c_uint8 * length).from_buffer(data)
+        # DLL sẽ sửa trực tiếp trên vùng nhớ của 'data'
+        actual_size = self.__lib__.Decrypt(self._instance, ptr, length, nonce)
+        return actual_size
